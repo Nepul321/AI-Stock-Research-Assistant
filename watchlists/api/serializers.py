@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from ..models import Watchlist
 from stocks.api.serializers import StockSerializer
+from stocks.models import Stock
 
 
 class WatchlistSerializer(serializers.ModelSerializer):
@@ -12,3 +13,9 @@ class WatchlistSerializer(serializers.ModelSerializer):
             "name",
             "stocks",
         ]
+
+class AddStockSerializer(serializers.Serializer):
+    symbol = serializers.CharField(max_length=10)
+
+    def validate_symbol(self, value):
+        return value.upper().strip()

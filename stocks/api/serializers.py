@@ -11,3 +11,4 @@ class StockSerializer(serializers.ModelSerializer):
             "company_name",
             "exchange",
         ]
+        read_only_fields = ["company_name", "exchange"]
