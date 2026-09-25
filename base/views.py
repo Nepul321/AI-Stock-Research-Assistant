@@ -3,7 +3,7 @@ from .api.main import *
 
 
 def HomeView(request, *args, **kwargs):
-	template = "home.html"
+	template = "base/home.html"
 	context = {
 
 	}

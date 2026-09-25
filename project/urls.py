@@ -30,4 +30,6 @@ urlpatterns = [
     path('api/watchlists/', include('watchlists.urls')),
     path("api/token/", TokenObtainPairView.as_view()),
     path("api/token/refresh/", TokenRefreshView.as_view()),
+    path('api/users/', include('users.api.urls')),
+    path('accounts/', include('users.urls')),
 ]
