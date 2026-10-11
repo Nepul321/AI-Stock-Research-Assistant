@@ -13,6 +13,10 @@ class FinnhubService:
             symbol=symbol
         )
 
+    def get_stock_quote(self, symbol):
+        symbol = symbol.upper().strip()
+        return self.client.quote(symbol=symbol)
+
 
     def validate_stock(self, symbol):
 

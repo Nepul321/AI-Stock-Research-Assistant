@@ -1,13 +1,165 @@
 {% extends 'base/base.html' %}
 
 {% block title %}
-Stock Trends - Home
+Stock Trends - Dashboard
 {% endblock title %}
 
 
 {% block body %}
-<div class="container-fluid my-4">
-<h1>Stock Trends</h1>
-<hr />
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Dashboard</h1>
+            <p class="text-muted mb-0">
+                Welcome back, {{ request.user.username }}.
+            </p>
+        </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-2">Your Watchlists</p>
+                    <h2 class="display-6 mb-0">
+                        {{ watchlist_count }}
+                    </h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <p class="text-muted mb-2">Unique Stocks Tracked</p>
+                    <h2 class="display-6 mb-0">
+                        {{ tracked_stock_count }}
+                    </h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock quotes -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <h2 class="h5 mb-0">Your Stocks</h2>
+        </div>
+
+        <div class="card-body p-0">
+            {% if stock_quotes %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">Symbol</th>
+                                <th scope="col">Company</th>
+                                <th scope="col">Price</th>
+                                <th scope="col">Change</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for item in stock_quotes %}
+                                <tr>
+                                    <td>
+                                        <strong>
+                                            {{ item.stock.symbol }}
+                                        </strong>
+                                    </td>
+
+                                    <td>
+                                        {{ item.stock.company_name }}
+                                    </td>
+
+                                    <td>
+                                        {% if item.price is not None %}
+                                            ${{ item.price|floatformat:2 }}
+                                        {% else %}
+                                            <span class="text-muted">
+                                                Unavailable
+                                            </span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {% if item.change_percent is not None %}
+                                            <span class="{% if item.change_percent > 0 %}text-success{% elif item.change_percent < 0 %}text-danger{% else %}text-muted{% endif %}">
+                                                {% if item.change > 0 %}+{% endif %}{{ item.change|floatformat:2 }}
+                                                ({% if item.change_percent > 0 %}+{% endif %}{{ item.change_percent|floatformat:2 }}%)
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">
+                                                Unavailable
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="p-4 text-center">
+                    <h3 class="h6">No stocks yet</h3>
+                    <p class="text-muted mb-0">
+                        Add stocks to one of your watchlists to see
+                        them on your dashboard.
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+
+        {% if tracked_stock_count > 10 %}
+            <div class="card-footer bg-white text-muted small">
+                Showing the first 10 of {{ tracked_stock_count }} stocks.
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Watchlists -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h2 class="h5 mb-0">Your Watchlists</h2>
+        </div>
+
+        <div class="card-body">
+            {% if watchlists %}
+                <div class="row g-3">
+                    {% for watchlist in watchlists %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="border rounded p-3 h-100">
+                                <h3 class="h6">
+                                    {{ watchlist.name }}
+                                </h3>
+
+                                <p class="text-muted small mb-2">
+                                    {{ watchlist.stocks.count }}
+                                    stock{{ watchlist.stocks.count|pluralize }}
+                                </p>
+
+                                {% for stock in watchlist.stocks.all %}
+                                    <span class="badge text-bg-light border me-1 mb-1">
+                                        {{ stock.symbol }}
+                                    </span>
+                                {% empty %}
+                                    <p class="small text-muted mb-0">
+                                        This watchlist is empty.
+                                    </p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">
+                    You haven't created a watchlist yet.
+                </p>
+            {% endif %}
+        </div>
+    </div>
+
 </div>
 {% endblock body %}
