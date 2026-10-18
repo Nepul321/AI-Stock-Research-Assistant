@@ -1,10 +1,15 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 
+from base.api.main import FinnhubService
 from .forms import StockSearchForm
 from .models import Stock
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -65,4 +70,36 @@ def stock_search(request):
         request,
         "stocks/search.html",
         {"form": form},
+    )
+
+
+@login_required
+def stock_detail(request, pk):
+    stock = get_object_or_404(Stock, pk=pk)
+    profile = {}
+    quote = {}
+
+    try:
+        finnhub = FinnhubService()
+    except Exception:
+        logger.exception("Failed to initialize Finnhub for %s", stock.symbol)
+    else:
+        try:
+            profile = finnhub.get_stock_profile(stock.symbol) or {}
+        except Exception:
+            logger.exception("Failed to retrieve profile for %s", stock.symbol)
+
+        try:
+            quote = finnhub.get_stock_quote(stock.symbol) or {}
+        except Exception:
+            logger.exception("Failed to retrieve quote for %s", stock.symbol)
+
+    return render(
+        request,
+        "stocks/detail.html",
+        {
+            "stock": stock,
+            "profile": profile,
+            "quote": quote,
+        },
     )

@@ -1,0 +1,105 @@
+{% extends "base/base.html" %}
+
+{% block title %}{{ profile.name|default:stock.company_name|default:stock.symbol }} ({{ stock.symbol }}){% endblock %}
+
+{% block body %}
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <p class="text-muted small mb-1">
+                {{ stock.symbol }}
+                {% if profile.exchange or stock.exchange %}
+                    &middot; {{ profile.exchange|default:stock.exchange }}
+                {% endif %}
+                {% if profile.country %}
+                    &middot; {{ profile.country }}
+                {% endif %}
+            </p>
+            <h1 class="h2 mb-1">
+                {{ profile.name|default:stock.company_name|default:stock.symbol }}
+            </h1>
+            {% if profile.finnhubIndustry %}
+                <p class="text-muted mb-0">{{ profile.finnhubIndustry }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <section class="card h-100">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h5 mb-0">Market quote</h2>
+                </div>
+                <div class="card-body">
+                    {% if quote.c %}
+                        <div class="mb-4">
+                            <p class="text-muted small mb-1">Current price</p>
+                            <p class="h2 mb-1">
+                                {% if profile.currency %}{{ profile.currency }} {% endif %}{{ quote.c|floatformat:"2g" }}
+                            </p>
+                            {% if quote.d is not None and quote.dp is not None %}
+                                <p class="mb-0 {% if quote.d > 0 %}text-success{% elif quote.d < 0 %}text-danger{% else %}text-muted{% endif %}">
+                                    {% if quote.d > 0 %}+{% endif %}{{ quote.d|floatformat:"2g" }}
+                                    ({% if quote.dp > 0 %}+{% endif %}{{ quote.dp|floatformat:"2g" }}%)
+                                </p>
+                            {% endif %}
+                        </div>
+
+                        <dl class="row mb-0">
+                            <dt class="col-sm-6 text-muted fw-normal">Day high</dt>
+                            <dd class="col-sm-6">{% if quote.h is not None %}{{ quote.h|floatformat:"2g" }}{% else %}Unavailable{% endif %}</dd>
+                            <dt class="col-sm-6 text-muted fw-normal">Day low</dt>
+                            <dd class="col-sm-6">{% if quote.l is not None %}{{ quote.l|floatformat:"2g" }}{% else %}Unavailable{% endif %}</dd>
+                            <dt class="col-sm-6 text-muted fw-normal">Open</dt>
+                            <dd class="col-sm-6">{% if quote.o is not None %}{{ quote.o|floatformat:"2g" }}{% else %}Unavailable{% endif %}</dd>
+                            <dt class="col-sm-6 text-muted fw-normal">Previous close</dt>
+                            <dd class="col-sm-6 mb-0">{% if quote.pc is not None %}{{ quote.pc|floatformat:"2g" }}{% else %}Unavailable{% endif %}</dd>
+                        </dl>
+                    {% else %}
+                        <p class="text-muted mb-0">
+                            A live quote is not available right now. The saved stock details are shown here.
+                        </p>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+
+        <div class="col-lg-5">
+            <section class="card h-100">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h5 mb-0">Company information</h2>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5 text-muted fw-normal">Symbol</dt>
+                        <dd class="col-sm-7">{{ stock.symbol }}</dd>
+                        <dt class="col-sm-5 text-muted fw-normal">Exchange</dt>
+                        <dd class="col-sm-7">{{ profile.exchange|default:stock.exchange|default:"Unavailable" }}</dd>
+                        <dt class="col-sm-5 text-muted fw-normal">Country</dt>
+                        <dd class="col-sm-7">{{ profile.country|default:"Unavailable" }}</dd>
+                        <dt class="col-sm-5 text-muted fw-normal">Currency</dt>
+                        <dd class="col-sm-7">{{ profile.currency|default:"Unavailable" }}</dd>
+                        {% if profile.ipo %}
+                            <dt class="col-sm-5 text-muted fw-normal">IPO date</dt>
+                            <dd class="col-sm-7">{{ profile.ipo }}</dd>
+                        {% endif %}
+                        {% if profile.marketCapitalization %}
+                            <dt class="col-sm-5 text-muted fw-normal">Market cap</dt>
+                            <dd class="col-sm-7">{% if profile.currency %}{{ profile.currency }} {% endif %}{{ profile.marketCapitalization|floatformat:"0g" }} million</dd>
+                        {% endif %}
+                        {% if profile.weburl %}
+                            <dt class="col-sm-5 text-muted fw-normal">Website</dt>
+                            <dd class="col-sm-7"><a href="{{ profile.weburl }}" target="_blank" rel="noopener noreferrer">Visit company site</a></dd>
+                        {% endif %}
+                    </dl>
+                    {% if not profile %}
+                        <p class="text-muted small mt-3 mb-0">
+                            Live company information is unavailable. Saved stock data is shown where possible.
+                        </p>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

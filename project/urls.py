@@ -21,10 +21,16 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
+from users.views import CustomPasswordResetConfirmView
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path(
+        "reset/<uidb64>/<token>/",
+        CustomPasswordResetConfirmView.as_view(),
+        name="password_reset_confirm_email",
+    ),
     path('', include('base.urls')),
     path('api/stocks/', include('stocks.urls')),
     path('api/watchlists/', include('watchlists.urls')),
