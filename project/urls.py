@@ -39,4 +39,5 @@ urlpatterns = [
     path('api/users/', include('users.api.urls')),
     path('accounts/', include('users.urls')),
     path('stocks/', include('stocks.urls_frontend')),
+    path('watchlists/', include('watchlists.urls_frontend')),
 ]

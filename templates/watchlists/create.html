@@ -1,0 +1,23 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Create Watchlist{% endblock %}
+
+{% block body %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h2 class="h5 mb-0">Create Watchlist</h2>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'create_watchlist' %}">
+                        {% csrf_token %}
+                        {{ form.as_p }}
+                        <button type="submit" class="btn btn-primary">Create</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

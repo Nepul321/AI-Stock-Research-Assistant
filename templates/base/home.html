@@ -129,6 +129,7 @@ Stock Trends - Dashboard
     <div class="card shadow-sm">
         <div class="card-header bg-white py-3">
             <h2 class="h5 mb-0">Your Watchlists</h2>
+            <a href="{% url 'create_watchlist' %}" class="btn btn-outline-primary btn-sm">Create Watchlist</a>
         </div>
 
         <div class="card-body">
@@ -156,6 +157,10 @@ Stock Trends - Dashboard
                                         This watchlist is empty.
                                     </p>
                                 {% endfor %}
+                                <div class="mt-3">
+                                    <a href="{% url 'watchlist_detail_delete' watchlist.pk %}" class="btn btn-outline-primary btn-sm me-2">View</a>
+                                    <a href="{% url 'watchlist_update' watchlist.pk %}" class="btn btn-outline-secondary btn-sm">Edit</a>
+                                </div>
                             </div>
                         </div>
                     {% endfor %}
