@@ -38,6 +38,10 @@ For the AI portion of the project, I may use either the **Anthropic Claude API**
 - **JWT Authentication**
 - **Anthropic Claude API or Google Gemini API** for planned AI functionality
 
+## AI Assistance
+
+- Used GitHub Copilot to assist with code generation, debugging, and development.
+
 ## Architecture
 
 The project uses a service layer to separate external financial data integrations from the Django application logic.
