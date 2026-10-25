@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'watchlists',
     'base',
     'users',
+    'portfolios',
 ]
 
 REST_FRAMEWORK = {

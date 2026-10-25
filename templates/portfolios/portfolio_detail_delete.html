@@ -1,0 +1,90 @@
+{% extends 'base/base.html' %}
+
+{% block title %}{{ portfolio.name }}{% endblock %}
+
+{% block body %}
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <p class="text-muted small mb-1">Portfolio</p>
+            <h1 class="h2 mb-0">{{ portfolio.name }}</h1>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'portfolio_update' portfolio.pk %}" class="btn btn-outline-secondary">Edit</a>
+            <a href="{% url 'portfolios' %}" class="btn btn-outline-primary">All Portfolios</a>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <h2 class="h5 mb-0">Add a stock</h2>
+        </div>
+        <div class="card-body">
+            {% if form.stock.field.queryset or form.is_bound %}
+                <form method="post" action="{% url 'portfolio_add_stock' portfolio.pk %}">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <button type="submit" class="btn btn-primary">Add Stock</button>
+                </form>
+            {% else %}
+                <p class="text-muted mb-0">
+                    There are no stocks in your watchlists available to add to this portfolio.
+                </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <h2 class="h5 mb-0">Stocks in this portfolio</h2>
+        </div>
+        <div class="card-body p-0">
+            {% with holdings=portfolio.portfolio_stocks.all %}
+                {% if holdings %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th scope="col">Symbol</th>
+                                    <th scope="col">Company</th>
+                                    <th scope="col">Shares</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for holding in holdings %}
+                                    <tr>
+                                        <td>
+                                            <a class="link-body-emphasis fw-semibold text-decoration-none"
+                                               href="{% url 'stock_detail' holding.stock.pk %}">
+                                                {{ holding.stock.symbol }}
+                                            </a>
+                                        </td>
+                                        <td>{{ holding.stock.company_name|default:"-" }}</td>
+                                        <td>{{ holding.amount|floatformat:4 }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted p-4 mb-0">This portfolio has no stocks yet.</p>
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+
+    <div class="card border-danger shadow-sm">
+        <div class="card-header bg-white py-3">
+            <h2 class="h5 text-danger mb-0">Delete Portfolio</h2>
+        </div>
+        <div class="card-body">
+            <p>Are you sure you want to delete "{{ portfolio.name }}"? This also removes its saved holdings.</p>
+            <form method="post" action="{% url 'portfolio_detail_delete' portfolio.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Delete Portfolio</button>
+                <a href="{% url 'portfolios' %}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

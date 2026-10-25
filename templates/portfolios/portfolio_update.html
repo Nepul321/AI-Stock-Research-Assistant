@@ -1,0 +1,25 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Edit {{ portfolio.name }}{% endblock %}
+
+{% block body %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h1 class="h5 mb-0">Edit Portfolio</h1>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'portfolio_update' portfolio.pk %}">
+                        {% csrf_token %}
+                        {{ form.as_p }}
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                        <a href="{% url 'portfolio_detail_delete' portfolio.pk %}" class="btn btn-secondary">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

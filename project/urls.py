@@ -34,10 +34,12 @@ urlpatterns = [
     path('', include('base.urls')),
     path('api/stocks/', include('stocks.urls')),
     path('api/watchlists/', include('watchlists.urls')),
+    path('api/portfolios/', include('portfolios.api.urls')),
     path("api/token/", TokenObtainPairView.as_view()),
     path("api/token/refresh/", TokenRefreshView.as_view()),
     path('api/users/', include('users.api.urls')),
     path('accounts/', include('users.urls')),
     path('stocks/', include('stocks.urls_frontend')),
     path('watchlists/', include('watchlists.urls_frontend')),
+    path('portfolios/', include('portfolios.urls')),
 ]
