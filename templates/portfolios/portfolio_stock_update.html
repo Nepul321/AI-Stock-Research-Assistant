@@ -1,0 +1,14 @@
+{% extends "base/base.html" %}
+
+{% block title %}Update Portfolio Stock{% endblock %}
+
+{% block body %}
+<div class="container py-4">
+  <h1>Update Portfolio Stock</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Update</button>
+  </form>
+</div>
+{% endblock %}

@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.urls import reverse
+from unittest.mock import patch
 from rest_framework.test import APITestCase
 
 from portfolios.models import Portfolio, PortfolioStock
@@ -122,7 +123,17 @@ class PortfolioFrontendTests(TestCase):
         self.portfolio.refresh_from_db()
         self.assertEqual(self.portfolio.name, "Updated portfolio")
 
-    def test_update_and_detail_pages_render(self):
+    @patch("portfolios.views.FinnhubService")
+    def test_update_and_detail_pages_render(self, finnhub_service):
+        stock = Stock(symbol="AAPL", company_name="Apple", exchange="NASDAQ")
+        Stock.objects.bulk_create([stock])
+        watchlist = Watchlist.objects.create(user=self.user, name="Tech")
+        watchlist.stocks.add(stock)
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio, stock=stock, amount="2.0000"
+        )
+        finnhub_service.return_value.get_stock_quote.return_value = {"c": 150.25}
+
         update_response = self.client.get(
             reverse("portfolio_update", args=[self.portfolio.pk])
         )
@@ -132,7 +143,84 @@ class PortfolioFrontendTests(TestCase):
 
         self.assertEqual(update_response.status_code, 200)
         self.assertEqual(detail_response.status_code, 200)
-        self.assertContains(detail_response, "This portfolio has no stocks yet.")
+        self.assertContains(detail_response, "AAPL")
+        self.assertContains(detail_response, "Total portfolio value")
+        self.assertContains(detail_response, "$300.50")
+        self.assertContains(detail_response, "portfolio_value.js")
+
+    @patch("portfolios.views.FinnhubService")
+    def test_portfolio_value_returns_sum_of_holdings(self, finnhub_service):
+        first_stock = Stock(symbol="AAPL", company_name="Apple", exchange="NASDAQ")
+        second_stock = Stock(symbol="MSFT", company_name="Microsoft", exchange="NASDAQ")
+        Stock.objects.bulk_create([first_stock, second_stock])
+        watchlist = Watchlist.objects.create(user=self.user, name="Tech")
+        watchlist.stocks.add(first_stock, second_stock)
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio, stock=first_stock, amount="10.0000"
+        )
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio, stock=second_stock, amount="2.5000"
+        )
+        finnhub_service.return_value.get_stock_quote.side_effect = [
+            {"c": 12.34},
+            {"c": 100},
+        ]
+
+        response = self.client.get(
+            reverse("portfolio_value", args=[self.portfolio.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"total": "373.400000", "currency": "USD"})
+        self.assertEqual(
+            finnhub_service.return_value.get_stock_quote.call_count, 2
+        )
+
+    @patch("portfolios.views.FinnhubService")
+    def test_portfolio_value_reports_missing_quote(self, finnhub_service):
+        stock = Stock(symbol="AAPL", company_name="Apple", exchange="NASDAQ")
+        Stock.objects.bulk_create([stock])
+        watchlist = Watchlist.objects.create(user=self.user, name="Tech")
+        watchlist.stocks.add(stock)
+        PortfolioStock.objects.create(portfolio=self.portfolio, stock=stock)
+        finnhub_service.return_value.get_stock_quote.return_value = {"c": None}
+
+        response = self.client.get(
+            reverse("portfolio_value", args=[self.portfolio.pk])
+        )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("AAPL", response.json()["error"])
+
+    def test_portfolio_value_is_scoped_to_current_user(self):
+        other_portfolio = Portfolio.objects.create(
+            user=self.other_user, name="Private"
+        )
+
+        response = self.client.get(
+            reverse("portfolio_value", args=[other_portfolio.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_portfolio_value_requires_login(self):
+        self.client.logout()
+
+        response = self.client.get(
+            reverse("portfolio_value", args=[self.portfolio.pk])
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_empty_portfolio_value_is_zero_without_market_data_call(self):
+        with patch("portfolios.views.FinnhubService") as finnhub_service:
+            response = self.client.get(
+                reverse("portfolio_value", args=[self.portfolio.pk])
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"total": "0", "currency": "USD"})
+        finnhub_service.assert_not_called()
 
     def test_detail_form_offers_stocks_from_any_user_watchlist(self):
         first_stock = Stock(symbol="AAPL", company_name="Apple", exchange="NASDAQ")
@@ -147,6 +235,11 @@ class PortfolioFrontendTests(TestCase):
         )
         watched_stock.stocks.add(first_stock)
         another_watchlist.stocks.add(second_stock)
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio,
+            stock=first_stock,
+            amount="1.0000",
+        )
         other_watchlist = Watchlist.objects.create(
             user=self.other_user, name="Other"
         )
@@ -156,9 +249,44 @@ class PortfolioFrontendTests(TestCase):
             reverse("portfolio_detail_delete", args=[self.portfolio.pk])
         )
 
+        choices = response.context["form"].fields["stock"].queryset
+        self.assertTrue(choices.filter(pk=first_stock.pk).exists())
+        self.assertTrue(choices.filter(pk=second_stock.pk).exists())
+        self.assertFalse(choices.filter(pk=other_stock.pk).exists())
         self.assertContains(response, "AAPL")
         self.assertContains(response, "MSFT")
         self.assertNotContains(response, "GOOG")
+
+    def test_update_stock_form_includes_current_holding(self):
+        stock = Stock(symbol="AAPL", company_name="Apple", exchange="NASDAQ")
+        other_stock = Stock(
+            symbol="MSFT", company_name="Microsoft", exchange="NASDAQ"
+        )
+        Stock.objects.bulk_create([stock, other_stock])
+        watchlist = Watchlist.objects.create(user=self.user, name="Tech")
+        watchlist.stocks.add(stock, other_stock)
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio,
+            stock=stock,
+            amount="1.0000",
+        )
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio,
+            stock=other_stock,
+            amount="2.0000",
+        )
+
+        response = self.client.get(
+            reverse(
+                "portfolio_update_stock",
+                args=[self.portfolio.pk, stock.pk],
+            )
+        )
+
+        choices = response.context["form"].fields["stock"].queryset
+        self.assertTrue(choices.filter(pk=stock.pk).exists())
+        self.assertFalse(choices.filter(pk=other_stock.pk).exists())
+        self.assertContains(response, f'<option value="{stock.pk}" selected>')
 
     def test_add_stock_to_portfolio_from_watchlist(self):
         stock = Stock(symbol="AAPL", company_name="Apple", exchange="NASDAQ")
@@ -179,6 +307,33 @@ class PortfolioFrontendTests(TestCase):
             portfolio=self.portfolio, stock=stock
         )
         self.assertEqual(holding.amount, 1.25)
+
+    def test_adding_existing_stock_increases_amount_without_duplicate(self):
+        stock = Stock(symbol="AAPL", company_name="Apple", exchange="NASDAQ")
+        Stock.objects.bulk_create([stock])
+        watchlist = Watchlist.objects.create(user=self.user, name="Tech")
+        watchlist.stocks.add(stock)
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio,
+            stock=stock,
+            amount="1.2500",
+        )
+
+        response = self.client.post(
+            reverse("portfolio_add_stock", args=[self.portfolio.pk]),
+            {"stock": stock.pk, "amount": "2.5000"},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("portfolio_detail_delete", args=[self.portfolio.pk]),
+        )
+        holdings = PortfolioStock.objects.filter(
+            portfolio=self.portfolio,
+            stock=stock,
+        )
+        self.assertEqual(holdings.count(), 1)
+        self.assertEqual(holdings.get().amount, 3.75)
 
     def test_add_stock_rejects_stock_outside_user_watchlists(self):
         stock = Stock(symbol="MSFT", company_name="Microsoft", exchange="NASDAQ")
@@ -320,7 +475,7 @@ class PortfolioAPITests(APITestCase):
         )
         self.assertEqual(update_response.status_code, 200)
         portfolio_stock.refresh_from_db()
-        self.assertEqual(portfolio_stock.amount, 2.5)
+        self.assertEqual(portfolio_stock.amount, 3.75)
 
         remove_response = self.client.delete(
             reverse(

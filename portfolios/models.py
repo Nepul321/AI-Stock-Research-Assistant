@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models import F
 from django.db.models.signals import m2m_changed
 from django.db.models.signals import post_delete, pre_delete
 from watchlists.models import Watchlist
@@ -52,6 +53,20 @@ class PortfolioStock(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+def add_portfolio_stock(portfolio, stock, amount):
+    portfolio_stock, created = PortfolioStock.objects.get_or_create(
+        portfolio=portfolio,
+        stock=stock,
+        defaults={"amount": amount},
+    )
+    if not created:
+        PortfolioStock.objects.filter(pk=portfolio_stock.pk).update(
+            amount=F("amount") + amount
+        )
+        portfolio_stock.refresh_from_db()
+    return portfolio_stock
 
 
 def validate_portfolio_stock_add(sender, instance, reverse, pk_set, **kwargs):

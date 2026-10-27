@@ -2,7 +2,7 @@ from django import forms
 
 from stocks.models import Stock
 
-from .models import Portfolio, PortfolioStock
+from .models import Portfolio, PortfolioStock, add_portfolio_stock
 
 
 class PortfolioForm(forms.ModelForm):
@@ -37,15 +37,24 @@ class PortfolioStockForm(forms.ModelForm):
     def __init__(self, *args, portfolio, **kwargs):
         super().__init__(*args, **kwargs)
         self.portfolio = portfolio
-        self.fields["stock"].queryset = (
-            Stock.objects.filter(watchlists__user=portfolio.user)
-            .exclude(portfolio_stocks__portfolio=portfolio)
-            .distinct()
-        )
+        queryset = Stock.objects.filter(watchlists__user=portfolio.user)
+        if self.instance.pk:
+            existing_stock_ids = portfolio.portfolio_stocks.exclude(
+                pk=self.instance.pk
+            ).values_list("stock_id", flat=True)
+            queryset = queryset.exclude(pk__in=existing_stock_ids)
+        self.fields["stock"].queryset = queryset.distinct()
 
     def save(self, commit=True):
         portfolio_stock = super().save(commit=False)
         portfolio_stock.portfolio = self.portfolio
         if commit:
-            portfolio_stock.save()
+            if self.instance.pk:
+                portfolio_stock.save()
+            else:
+                portfolio_stock = add_portfolio_stock(
+                    self.portfolio,
+                    portfolio_stock.stock,
+                    portfolio_stock.amount,
+                )
         return portfolio_stock

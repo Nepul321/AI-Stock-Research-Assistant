@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from stocks.models import Stock
-from ..models import Portfolio, PortfolioStock
+from ..models import Portfolio, add_portfolio_stock
 from .serializers import AddStockSerializer, PortfolioSerializer
 
 
@@ -60,11 +60,7 @@ class PortfolioAddStockView(APIView):
             )
 
         try:
-            portfolio_stock, _ = PortfolioStock.objects.update_or_create(
-                portfolio=portfolio,
-                stock=stock,
-                defaults={"amount": amount},
-            )
+            portfolio_stock = add_portfolio_stock(portfolio, stock, amount)
         except ValidationError:
             return Response(
                 {"detail": "Stock must be in one of your watchlists."},
