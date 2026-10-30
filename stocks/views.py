@@ -1,4 +1,6 @@
 import logging
+import math
+from datetime import datetime, timezone
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -78,6 +80,7 @@ def stock_detail(request, pk):
     stock = get_object_or_404(Stock, pk=pk)
     profile = {}
     quote = {}
+    chart_data = {"labels": [], "prices": [], "trend": []}
 
     try:
         finnhub = FinnhubService()
@@ -94,6 +97,49 @@ def stock_detail(request, pk):
         except Exception:
             logger.exception("Failed to retrieve quote for %s", stock.symbol)
 
+        try:
+            candles = finnhub.get_stock_candles(stock.symbol) or {}
+        except Exception:
+            logger.exception("Failed to retrieve price history for %s", stock.symbol)
+        else:
+            if isinstance(candles, dict) and candles.get("s") == "ok":
+                timestamps = candles.get("t", [])
+                prices = candles.get("c", [])
+                observations = []
+
+                for timestamp, price in zip(timestamps, prices):
+                    try:
+                        timestamp = int(timestamp)
+                        price = float(price)
+                    except (TypeError, ValueError, OverflowError):
+                        continue
+
+                    if not math.isfinite(price):
+                        continue
+
+                    observations.append((timestamp, price))
+
+                observations.sort()
+                chart_data["labels"] = [
+                    datetime.fromtimestamp(timestamp, tz=timezone.utc).strftime(
+                        "%Y-%m-%d"
+                    )
+                    for timestamp, _ in observations
+                ]
+                chart_data["prices"] = [
+                    price for _, price in observations
+                ]
+                chart_data["trend"] = [
+                    (
+                        sum(
+                            chart_data["prices"][index - 19:index + 1]
+                        ) / 20
+                        if index >= 19
+                        else None
+                    )
+                    for index in range(len(chart_data["prices"]))
+                ]
+
     return render(
         request,
         "stocks/detail.html",
@@ -101,5 +147,6 @@ def stock_detail(request, pk):
             "stock": stock,
             "profile": profile,
             "quote": quote,
+            "chart_data": chart_data,
         },
     )

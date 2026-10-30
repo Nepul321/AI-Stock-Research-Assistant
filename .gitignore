@@ -1,9 +1,8 @@
 db.sqlite3
 .env
-static/
 media/
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-staticfiles/
+/staticfiles/

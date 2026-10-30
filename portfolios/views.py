@@ -66,6 +66,15 @@ def calculate_portfolio_value(portfolio):
     return total
 
 
+def get_portfolio_value_history(portfolio):
+    snapshots = list(portfolio.value_snapshots.order_by('-date')[:365])
+    snapshots.reverse()
+    return [
+        {'date': snapshot.date.isoformat(), 'value': str(snapshot.value)}
+        for snapshot in snapshots
+    ]
+
+
 @login_required
 def portfolio_list(request):
     portfolios = (
@@ -162,6 +171,7 @@ def portfolio_detail_delete(request, pk):
             "form": PortfolioStockForm(portfolio=portfolio),
             "portfolio_value": portfolio_value,
             "portfolio_value_error": portfolio_value_error,
+            "portfolio_value_history": get_portfolio_value_history(portfolio),
         },
     )
 
@@ -186,7 +196,11 @@ def portfolio_add_stock(request, pk):
     return render(
         request,
         "portfolios/portfolio_detail_delete.html",
-        {"portfolio": portfolio, "form": form},
+        {
+            "portfolio": portfolio,
+            "form": form,
+            "portfolio_value_history": get_portfolio_value_history(portfolio),
+        },
     )
 
 

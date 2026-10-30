@@ -20,6 +20,29 @@ class Portfolio(models.Model):
         return self.name
 
 
+class PortfolioValueSnapshot(models.Model):
+    portfolio = models.ForeignKey(
+        Portfolio,
+        on_delete=models.CASCADE,
+        related_name='value_snapshots',
+    )
+    date = models.DateField()
+    value = models.DecimalField(max_digits=24, decimal_places=4)
+    currency = models.CharField(max_length=3, default='USD')
+
+    class Meta:
+        ordering = ('date',)
+        constraints = [
+            models.UniqueConstraint(
+                fields=('portfolio', 'date'),
+                name='unique_portfolio_value_snapshot_date',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.portfolio.name} on {self.date}: {self.value} {self.currency}'
+
+
 class PortfolioStock(models.Model):
     portfolio = models.ForeignKey(Portfolio, on_delete=models.CASCADE, related_name='portfolio_stocks')
     stock = models.ForeignKey('stocks.Stock', on_delete=models.CASCADE, related_name='portfolio_stocks')

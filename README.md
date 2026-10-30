@@ -6,7 +6,7 @@ An AI-powered stock research assistant built with **Django**, **Django REST Fram
 
 The goal of this project is to create a platform where users can research stocks, manage personal watchlists, access company and market information, and use AI-powered tools to better understand financial data.
 
-For the AI portion of the project, I may use either the **Anthropic Claude API** or **Google Gemini API**. The final provider has not yet been decided.
+For the AI portion of the project, I may use either the **Anthropic Claude API** or **OpenAI API**. The final provider has not yet been decided.
 
 ## Features
 
@@ -36,7 +36,7 @@ For the AI portion of the project, I may use either the **Anthropic Claude API**
 - **Bootstrap**
 - **Django Templates**
 - **JWT Authentication**
-- **Anthropic Claude API or Google Gemini API** for planned AI functionality
+- **Anthropic Claude API or OpenAI API** for planned AI functionality
 
 ## AI Assistance
 
@@ -47,6 +47,18 @@ For the AI portion of the project, I may use either the **Anthropic Claude API**
 The project uses a service layer to separate external financial data integrations from the Django application logic.
 
 Finnhub functionality is handled through a dedicated service, making the external API integration easier to maintain and extend as the project grows.
+
+## Portfolio value history
+
+Portfolio values are saved as daily snapshots. The capture function first tries Finnhub daily closing candles. If Finnhub returns HTTP 403 for candles (for example, when the account does not have access to that endpoint), it falls back to current quotes for every held stock, so a portfolio is priced consistently. Quote-based snapshots are dated on the capture day and reflect the quote at the time the job runs; schedule the job after market close for an end-of-day trend. Other price errors fail the run rather than saving a partial portfolio value. The portfolio detail page charts up to the latest 365 saved values. Existing portfolios have no historical snapshots to backfill; their charts build from the first scheduled capture onward.
+
+Run a capture manually from the directory containing `manage.py`:
+
+```powershell
+python manage.py capture_portfolio_snapshots
+```
+
+Schedule this command once per weekday after the US market close using the production platform's scheduler (for example, cron, a container scheduled job, or a hosted scheduler). No task-queue dependency is required. The underlying `capture_daily_portfolio_snapshots()` function in `portfolios.services` is also independent of the command, so a Celery task can call it directly when Celery is added. When candle access is available, a portfolio's point uses its latest common trading date; in quote fallback mode, all holdings use quotes captured on the scheduled run date.
 
 ## Disclaimer
 

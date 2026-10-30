@@ -43,6 +43,41 @@
 
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-white py-3">
+            <h2 class="h5 mb-0">Portfolio value over time</h2>
+        </div>
+        <div class="card-body">
+            {% if portfolio_value_history %}
+                <p class="text-muted small">Daily values in USD, using closing prices when available or current quotes otherwise. History begins when daily snapshots are first captured.</p>
+                <canvas
+                    id="portfolio-value-chart"
+                    class="w-100"
+                    height="320"
+                    style="height: 320px;"
+                    role="img"
+                    aria-label="Daily portfolio value over time"
+                ></canvas>
+                <table class="visually-hidden">
+                    <caption>Daily portfolio value history in USD</caption>
+                    <thead>
+                        <tr><th scope="col">Date</th><th scope="col">Value</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for point in portfolio_value_history %}
+                            <tr><td>{{ point.date }}</td><td>${{ point.value }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {{ portfolio_value_history|json_script:"portfolio-value-history" }}
+            {% else %}
+                <p class="text-muted mb-0">
+                    No daily history yet. Values will appear here after the scheduled snapshot job runs.
+                </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
             <h2 class="h5 mb-0">Add a stock</h2>
         </div>
         <div class="card-body">
@@ -125,4 +160,5 @@
 
 {% block js %}
 <script src="{% static 'portfolios/portfolio_value.js' %}" defer></script>
+<script src="{% static 'portfolios/portfolio_chart.js' %}" defer></script>
 {% endblock %}

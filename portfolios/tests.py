@@ -1,14 +1,27 @@
+from datetime import datetime, timezone as datetime_timezone
+from io import StringIO
+from finnhub.exceptions import FinnhubAPIException
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.db import transaction
 from django.urls import reverse
-from unittest.mock import patch
+from django.utils import timezone
+from unittest.mock import Mock, patch
 from rest_framework.test import APITestCase
 
-from portfolios.models import Portfolio, PortfolioStock
+from portfolios.models import (
+    Portfolio,
+    PortfolioStock,
+    PortfolioValueSnapshot,
+)
 from stocks.models import Stock
 from watchlists.models import Watchlist
+from portfolios.services import (
+    PortfolioSnapshotUnavailable,
+    capture_daily_portfolio_snapshots,
+)
 
 
 class PortfolioStockTests(TestCase):
@@ -387,6 +400,221 @@ class PortfolioFrontendTests(TestCase):
 
         self.assertRedirects(response, reverse("portfolios"))
         self.assertFalse(Portfolio.objects.filter(pk=self.portfolio.pk).exists())
+
+
+class PortfolioValueSnapshotTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="snapshot-user")
+        self.portfolio = Portfolio.objects.create(
+            user=self.user,
+            name="Daily values",
+        )
+        self.first_stock = Stock(
+            symbol="AAPL",
+            company_name="Apple",
+            exchange="NASDAQ",
+        )
+        self.second_stock = Stock(
+            symbol="MSFT",
+            company_name="Microsoft",
+            exchange="NASDAQ",
+        )
+        Stock.objects.bulk_create([self.first_stock, self.second_stock])
+        watchlist = Watchlist.objects.create(user=self.user, name="Tech")
+        watchlist.stocks.add(self.first_stock, self.second_stock)
+
+    @staticmethod
+    def _timestamp(day):
+        return int(
+            datetime(2026, 10, day, tzinfo=datetime_timezone.utc).timestamp()
+        )
+
+    def test_capture_uses_latest_common_close_and_is_idempotent(self):
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio,
+            stock=self.first_stock,
+            amount="2.0000",
+        )
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio,
+            stock=self.second_stock,
+            amount="3.0000",
+        )
+        candles_by_symbol = {
+            "AAPL": {
+                "s": "ok",
+                "t": [self._timestamp(28), self._timestamp(29)],
+                "c": [100, 110],
+            },
+            "MSFT": {
+                "s": "ok",
+                "t": [self._timestamp(27), self._timestamp(28)],
+                "c": [40, 50],
+            },
+        }
+
+        def candle_response(symbol, *, days):
+            self.assertEqual(days, 30)
+            return candles_by_symbol[symbol]
+
+        with patch("portfolios.services.FinnhubService") as finnhub_service:
+            finnhub_service.return_value.get_stock_candles.side_effect = (
+                candle_response
+            )
+            first_count = capture_daily_portfolio_snapshots()
+            second_count = capture_daily_portfolio_snapshots()
+
+        snapshot = PortfolioValueSnapshot.objects.get(portfolio=self.portfolio)
+        self.assertEqual(first_count, 1)
+        self.assertEqual(second_count, 1)
+        self.assertEqual(snapshot.date.isoformat(), "2026-10-28")
+        self.assertEqual(snapshot.value, 350)
+        self.assertEqual(
+            finnhub_service.return_value.get_stock_candles.call_count,
+            4,
+        )
+
+    def test_empty_portfolio_records_zero_without_market_data(self):
+        with patch("portfolios.services.FinnhubService") as finnhub_service:
+            count = capture_daily_portfolio_snapshots()
+
+        snapshot = PortfolioValueSnapshot.objects.get(portfolio=self.portfolio)
+        self.assertEqual(count, 1)
+        self.assertEqual(snapshot.value, 0)
+        self.assertEqual(snapshot.date, timezone.localdate())
+        finnhub_service.assert_not_called()
+
+    def test_failed_price_fetch_does_not_save_partial_snapshots(self):
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio,
+            stock=self.first_stock,
+        )
+        with patch("portfolios.services.FinnhubService") as finnhub_service:
+            finnhub_service.return_value.get_stock_candles.return_value = {
+                "s": "no_data",
+            }
+
+            with self.assertRaises(PortfolioSnapshotUnavailable):
+                capture_daily_portfolio_snapshots()
+
+        self.assertFalse(PortfolioValueSnapshot.objects.exists())
+
+    def test_forbidden_candles_fall_back_to_quotes_for_all_holdings(self):
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio,
+            stock=self.first_stock,
+            amount="2.0000",
+        )
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio,
+            stock=self.second_stock,
+            amount="3.0000",
+        )
+        forbidden_response = Mock()
+        forbidden_response.status_code = 403
+        forbidden_response.json.return_value = {
+            "error": "You don't have access to this resource."
+        }
+
+        with patch("portfolios.services.FinnhubService") as finnhub_service:
+            finnhub_service.return_value.get_stock_candles.side_effect = [
+                {"s": "ok", "t": [self._timestamp(28)], "c": [100]},
+                FinnhubAPIException(forbidden_response),
+            ]
+            finnhub_service.return_value.get_stock_quote.side_effect = [
+                {"c": 110},
+                {"c": 50},
+            ]
+
+            count = capture_daily_portfolio_snapshots()
+
+        snapshot = PortfolioValueSnapshot.objects.get(portfolio=self.portfolio)
+        self.assertEqual(count, 1)
+        self.assertEqual(snapshot.date, timezone.localdate())
+        self.assertEqual(snapshot.value, 370)
+        self.assertEqual(
+            finnhub_service.return_value.get_stock_quote.call_count,
+            2,
+        )
+
+    def test_forbidden_candles_and_missing_quote_do_not_save_snapshot(self):
+        PortfolioStock.objects.create(
+            portfolio=self.portfolio,
+            stock=self.first_stock,
+        )
+        forbidden_response = Mock()
+        forbidden_response.status_code = 403
+        forbidden_response.json.return_value = {"error": "Forbidden"}
+
+        with patch("portfolios.services.FinnhubService") as finnhub_service:
+            finnhub_service.return_value.get_stock_candles.side_effect = (
+                FinnhubAPIException(forbidden_response)
+            )
+            finnhub_service.return_value.get_stock_quote.return_value = {
+                "c": None,
+            }
+
+            with self.assertRaises(PortfolioSnapshotUnavailable):
+                capture_daily_portfolio_snapshots()
+
+        self.assertFalse(PortfolioValueSnapshot.objects.exists())
+
+    @patch(
+        "portfolios.management.commands.capture_portfolio_snapshots."
+        "capture_daily_portfolio_snapshots",
+        return_value=2,
+    )
+    def test_management_command_calls_the_shared_capture_function(
+        self,
+        capture,
+    ):
+        output = StringIO()
+
+        call_command("capture_portfolio_snapshots", stdout=output)
+
+        capture.assert_called_once_with()
+        self.assertIn("Captured values for 2 portfolios.", output.getvalue())
+
+    @patch("portfolios.views.FinnhubService")
+    def test_detail_page_renders_snapshot_chart_and_accessible_values(
+        self,
+        finnhub_service,
+    ):
+        self.client.force_login(self.user)
+        PortfolioValueSnapshot.objects.create(
+            portfolio=self.portfolio,
+            date="2026-10-28",
+            value="123.4500",
+        )
+        finnhub_service.return_value.get_stock_quote.return_value = {"c": 1}
+
+        response = self.client.get(
+            reverse("portfolio_detail_delete", args=[self.portfolio.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="portfolio-value-chart"')
+        self.assertContains(response, 'id="portfolio-value-history"')
+        self.assertContains(response, "2026-10-28")
+        self.assertContains(response, "$123.4500")
+        self.assertContains(response, "portfolio_chart.js")
+
+    def test_invalid_add_stock_keeps_snapshot_history_on_detail_page(self):
+        self.client.force_login(self.user)
+        PortfolioValueSnapshot.objects.create(
+            portfolio=self.portfolio,
+            date="2026-10-28",
+            value="123.4500",
+        )
+
+        response = self.client.post(
+            reverse("portfolio_add_stock", args=[self.portfolio.pk]),
+            {"amount": "1.0000"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="portfolio-value-chart"')
+        self.assertContains(response, "2026-10-28")
 
 
 class PortfolioAPITests(APITestCase):

@@ -101,5 +101,116 @@
             </section>
         </div>
     </div>
+
+    <section class="card mt-3">
+        <div class="card-header bg-white py-3">
+            <h2 class="h5 mb-0">Price trends</h2>
+        </div>
+        <div class="card-body">
+            {% if chart_data.labels %}
+                <p class="text-muted small mb-3">
+                    Daily closing prices over the past six months. The moving average smooths short-term changes; historical performance is not a prediction.
+                </p>
+                <div style="height: 320px;">
+                    <canvas
+                        id="stock-price-chart"
+                        data-currency="{{ profile.currency|default:'' }}"
+                        aria-label="Daily closing prices and 20-day moving average"
+                        role="img"
+                    ></canvas>
+                </div>
+                {{ chart_data|json_script:"stock-chart-data" }}
+            {% else %}
+                <p class="text-muted mb-0">
+                    Historical price data is unavailable right now.
+                </p>
+            {% endif %}
+        </div>
+    </section>
 </div>
+{% endblock %}
+
+{% block js %}
+    {% if chart_data.labels %}
+        <script>
+            const stockChartData = JSON.parse(
+                document.getElementById("stock-chart-data").textContent
+            );
+            const chartContext = document.getElementById("stock-price-chart");
+            const chartCurrency = chartContext.dataset.currency;
+            const valueFormatter = new Intl.NumberFormat("en-US", chartCurrency
+                ? {
+                    style: "currency",
+                    currency: chartCurrency,
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }
+                : {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }
+            );
+
+            new Chart(chartContext, {
+                type: "line",
+                data: {
+                    labels: stockChartData.labels,
+                    datasets: [
+                        {
+                            label: "Closing price",
+                            data: stockChartData.prices,
+                            borderColor: "#0d6efd",
+                            backgroundColor: "rgba(13, 110, 253, 0.1)",
+                            fill: true,
+                            pointRadius: 0,
+                            pointHitRadius: 8,
+                            tension: 0.2
+                        },
+                        {
+                            label: "20-day moving average",
+                            data: stockChartData.trend,
+                            borderColor: "#fd7e14",
+                            pointRadius: 0,
+                            pointHitRadius: 8,
+                            tension: 0.2
+                        }
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: "index"
+                    },
+                    plugins: {
+                        tooltip: {
+                            enabled: true,
+                            filter(context) {
+                                return context.parsed.y !== null;
+                            },
+                            callbacks: {
+                                label(context) {
+                                    return `${context.dataset.label}: ${valueFormatter.format(context.parsed.y)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: "Price"
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxTicksLimit: 8
+                            }
+                        }
+                    }
+                }
+            });
+        </script>
+    {% endif %}
 {% endblock %}
