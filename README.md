@@ -6,8 +6,6 @@ An AI-powered stock research assistant built with **Django**, **Django REST Fram
 
 The goal of this project is to create a platform where users can research stocks, manage personal watchlists, access company and market information, and use AI-powered tools to better understand financial data.
 
-For the AI portion of the project, I may use either the **Anthropic Claude API** or **OpenAI API**. The final provider has not yet been decided.
-
 ## Features
 
 - User registration and login
@@ -36,7 +34,7 @@ For the AI portion of the project, I may use either the **Anthropic Claude API**
 - **Bootstrap**
 - **Django Templates**
 - **JWT Authentication**
-- **Anthropic Claude API or OpenAI API** for planned AI functionality
+- **ChatGPT API** for planned AI functionality
 
 ## AI Assistance
 
