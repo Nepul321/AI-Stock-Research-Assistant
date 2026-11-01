@@ -7,11 +7,10 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from base.api.main import FinnhubService
-
+from base.api.exceptions import APIError
 
 
 class WatchlistListView(generics.ListCreateAPIView):
-    
     serializer_class = WatchlistSerializer
     permission_classes = [IsAuthenticated]
 
@@ -21,12 +20,14 @@ class WatchlistListView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+
 class WatchlistDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = WatchlistSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return Watchlist.objects.filter(user=self.request.user)
+
 
 class WatchlistAddStockView(APIView):
     permission_classes = [IsAuthenticated]
@@ -38,9 +39,10 @@ class WatchlistAddStockView(APIView):
                 user=request.user
             )
         except Watchlist.DoesNotExist:
-            return Response(
-                {"detail": "Watchlist not found."},
-                status=status.HTTP_404_NOT_FOUND
+            raise APIError(
+                "Watchlist not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="not_found",
             )
 
         serializer = AddStockSerializer(data=request.data)
@@ -58,19 +60,17 @@ class WatchlistAddStockView(APIView):
             try:
                 profile = finnhub_service.get_stock_profile(symbol)
             except Exception:
-                return Response(
-                    {
-                        "detail": "Unable to verify stock with Finnhub."
-                    },
-                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                raise APIError(
+                    "Unable to verify stock with Finnhub.",
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    code="stock_provider_unavailable",
                 )
 
             if not profile:
-                return Response(
-                    {
-                        "detail": f"Stock '{symbol}' was not found."
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
+                raise APIError(
+                    f"Stock '{symbol}' was not found.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    code="invalid_stock",
                 )
 
             stock = Stock.objects.create(
@@ -103,9 +103,10 @@ class WatchlistRemoveStockView(APIView):
                 user=request.user
             )
         except Watchlist.DoesNotExist:
-            return Response(
-                {"detail": "Watchlist not found."},
-                status=status.HTTP_404_NOT_FOUND
+            raise APIError(
+                "Watchlist not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="not_found",
             )
 
         symbol = symbol.upper()
@@ -113,20 +114,19 @@ class WatchlistRemoveStockView(APIView):
         try:
             stock = Stock.objects.get(symbol=symbol)
         except Stock.DoesNotExist:
-            return Response(
-                {"detail": "Stock not found."},
-                status=status.HTTP_404_NOT_FOUND
+            raise APIError(
+                "Stock not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="not_found",
             )
 
         if not watchlist.stocks.filter(pk=stock.pk).exists():
-            return Response(
-                {"detail": "Stock is not in this watchlist."},
-                status=status.HTTP_404_NOT_FOUND
+            raise APIError(
+                "Stock is not in this watchlist.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="not_found",
             )
 
         watchlist.stocks.remove(stock)
 
-        return Response(
-            {"detail": f"{symbol} removed from watchlist."},
-            status=status.HTTP_204_NO_CONTENT
-        )
+        return Response(status=status.HTTP_204_NO_CONTENT)

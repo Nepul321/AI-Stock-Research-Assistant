@@ -17,11 +17,14 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
 from users.views import CustomPasswordResetConfirmView
+from users.api.views import (
+    LogoutAPIView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
+    TokenObtainPairAPIView,
+    TokenRefreshAPIView,
+)
 
 
 urlpatterns = [
@@ -35,8 +38,31 @@ urlpatterns = [
     path('api/stocks/', include('stocks.urls')),
     path('api/watchlists/', include('watchlists.urls')),
     path('api/portfolios/', include('portfolios.api.urls')),
-    path("api/token/", TokenObtainPairView.as_view()),
-    path("api/token/refresh/", TokenRefreshView.as_view()),
+    path(
+        "api/token/",
+        TokenObtainPairAPIView.as_view(),
+        name="token_obtain_pair",
+    ),
+    path(
+        "api/token/refresh/",
+        TokenRefreshAPIView.as_view(),
+        name="token_refresh",
+    ),
+    path(
+        "api/token/logout/",
+        LogoutAPIView.as_view(),
+        name="token_logout",
+    ),
+    path(
+        "api/users/password-reset/",
+        PasswordResetRequestView.as_view(),
+        name="api_password_reset",
+    ),
+    path(
+        "api/users/password-reset/confirm/",
+        PasswordResetConfirmView.as_view(),
+        name="api_password_reset_confirm",
+    ),
     path('api/users/', include('users.api.urls')),
     path('accounts/', include('users.urls')),
     path('stocks/', include('stocks.urls_frontend')),

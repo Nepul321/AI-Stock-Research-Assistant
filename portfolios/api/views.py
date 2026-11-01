@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from stocks.models import Stock
+from base.api.exceptions import APIError
 from ..models import Portfolio, add_portfolio_stock
 from .serializers import AddStockSerializer, PortfolioSerializer
 
@@ -35,9 +36,10 @@ class PortfolioAddStockView(APIView):
         try:
             portfolio = Portfolio.objects.get(pk=pk, user=request.user)
         except Portfolio.DoesNotExist:
-            return Response(
-                {"detail": "Portfolio not found."},
-                status=status.HTTP_404_NOT_FOUND,
+            raise APIError(
+                "Portfolio not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="not_found",
             )
 
         serializer = AddStockSerializer(data=request.data)
@@ -48,24 +50,27 @@ class PortfolioAddStockView(APIView):
         try:
             stock = Stock.objects.get(symbol=symbol)
         except Stock.DoesNotExist:
-            return Response(
-                {"detail": "Stock not found."},
-                status=status.HTTP_404_NOT_FOUND,
+            raise APIError(
+                "Stock not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="not_found",
             )
 
         if not request.user.watchlists.filter(stocks=stock).exists():
-            return Response(
-                {"detail": "Stock must be in one of your watchlists."},
-                status=status.HTTP_400_BAD_REQUEST,
+            raise APIError(
+                "Stock must be in one of your watchlists.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                code="invalid_stock_membership",
             )
 
         try:
             portfolio_stock = add_portfolio_stock(portfolio, stock, amount)
-        except ValidationError:
-            return Response(
-                {"detail": "Stock must be in one of your watchlists."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        except ValidationError as exc:
+            raise APIError(
+                "Stock must be in one of your watchlists.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+                code="invalid_stock_membership",
+            ) from exc
 
         return Response(
             {
@@ -88,24 +93,27 @@ class PortfolioRemoveStockView(APIView):
         try:
             portfolio = Portfolio.objects.get(pk=pk, user=request.user)
         except Portfolio.DoesNotExist:
-            return Response(
-                {"detail": "Portfolio not found."},
-                status=status.HTTP_404_NOT_FOUND,
+            raise APIError(
+                "Portfolio not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="not_found",
             )
 
         symbol = symbol.upper()
         try:
             stock = Stock.objects.get(symbol=symbol)
         except Stock.DoesNotExist:
-            return Response(
-                {"detail": "Stock not found."},
-                status=status.HTTP_404_NOT_FOUND,
+            raise APIError(
+                "Stock not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="not_found",
             )
 
         if not portfolio.stocks.filter(pk=stock.pk).exists():
-            return Response(
-                {"detail": "Stock is not in this portfolio."},
-                status=status.HTTP_404_NOT_FOUND,
+            raise APIError(
+                "Stock is not in this portfolio.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                code="not_found",
             )
 
         portfolio.stocks.remove(stock)

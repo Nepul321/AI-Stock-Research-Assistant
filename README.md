@@ -48,6 +48,36 @@ The project uses a service layer to separate external financial data integration
 
 Finnhub functionality is handled through a dedicated service, making the external API integration easier to maintain and extend as the project grows.
 
+## REST API authentication
+
+The API accepts either the existing Django session or a JWT access token for protected endpoints. Access follows the frontend: stock, watchlist, portfolio, and password-change endpoints require authentication; registration and token login are available only to anonymous users.
+
+- `POST /api/users/register/` — register with `username`, `email`, `password`, and `confirm_password`.
+- `POST /api/token/` — obtain an access/refresh token pair with `username` and `password`.
+- `POST /api/token/refresh/` — rotate a refresh token by sending `refresh`; use the returned refresh token thereafter.
+- `POST /api/token/logout/` — revoke a refresh token by sending `refresh` with the authenticated user's access token.
+- `POST /api/users/change-password/` — authenticated; send `old_password`, `new_password`, and `confirm_password`.
+- `POST /api/users/password-reset/` — request a reset email using `email`. The response does not disclose whether that account exists.
+- `POST /api/users/password-reset/confirm/` — reset using `uidb64`, `token`, `new_password`, and `confirm_password`.
+
+Access tokens expire after five minutes and refresh tokens after one day. Refresh tokens rotate and are blacklisted when replaced or logged out; password changes and resets invalidate outstanding tokens.
+After changing a password through the API, clients should discard their stored access and refresh tokens; those credentials are already invalid, so the logout endpoint cannot authenticate them. A new token pair can be obtained by logging in with the new password.
+Run `python manage.py migrate` when deploying the token blacklist app, and schedule Django's `flushexpiredtokens` management command to remove expired token records.
+
+API errors use the same envelope for validation, authentication, permission, and expected application errors:
+
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Request validation failed.",
+    "details": {
+      "email": ["Enter a valid email address."]
+    }
+  }
+}
+```
+
 ## Portfolio value history
 
 Portfolio values are saved as daily snapshots. The capture function first tries Finnhub daily closing candles. If Finnhub returns HTTP 403 for candles (for example, when the account does not have access to that endpoint), it falls back to current quotes for every held stock, so a portfolio is priced consistently. Quote-based snapshots are dated on the capture day and reflect the quote at the time the job runs; schedule the job after market close for an end-of-day trend. Other price errors fail the run rather than saving a partial portfolio value. The portfolio detail page charts up to the latest 365 saved values. Existing portfolios have no historical snapshots to backfill; their charts build from the first scheduled capture onward.

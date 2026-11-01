@@ -11,7 +11,13 @@ from django.views.generic.edit import FormView
 from django.views.generic import CreateView, UpdateView
 from django.urls import reverse_lazy
 
-from .forms import RegisterForm, BootstrapPasswordChangeForm, AccountEditForm
+from .forms import (
+    AccountEditForm,
+    BootstrapPasswordChangeForm,
+    BootstrapPasswordResetForm,
+    BootstrapSetPasswordForm,
+    RegisterForm,
+)
 
 
 class RegisterView(UserPassesTestMixin, CreateView):
@@ -31,6 +37,7 @@ class RegisterView(UserPassesTestMixin, CreateView):
 
 
 class CustomPasswordResetView(auth_views.PasswordResetView):
+    form_class = BootstrapPasswordResetForm
     template_name = "registration/password_reset_form.html"
     email_template_name = "registration/password_reset_email.html"
     success_url = reverse_lazy("password_reset_done")
@@ -45,6 +52,7 @@ class CustomPasswordResetDoneView(auth_views.PasswordResetDoneView):
     name="dispatch",
 )
 class CustomPasswordResetConfirmView(auth_views.PasswordResetConfirmView):
+    form_class = BootstrapSetPasswordForm
     template_name = "registration/password_reset_confirm.html"
     success_url = reverse_lazy("password_reset_complete")
 

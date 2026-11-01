@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from stocks.models import Stock
 from watchlists.models import Watchlist
+from rest_framework.test import APITestCase
 
 
 class StockDetailViewTests(TestCase):
@@ -95,3 +96,31 @@ class StockDetailViewTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.content.decode().count(detail_url), 3)
 		self.assertContains(response, "$12,345.50")
+
+
+class StockAPIAccessTests(APITestCase):
+	def setUp(self):
+		self.user = User.objects.create_user(username="stock-api-user")
+		self.stock = Stock(
+			symbol="NVDA",
+			company_name="NVIDIA Corporation",
+			exchange="NASDAQ",
+		)
+		Stock.objects.bulk_create([self.stock])
+
+	def test_stock_endpoints_require_session_or_token_authentication(self):
+		list_response = self.client.get(reverse("stock-list"))
+		detail_response = self.client.get(
+			reverse("stock-detail", args=[self.stock.pk])
+		)
+
+		for response in (list_response, detail_response):
+			self.assertEqual(response.status_code, 403)
+			self.assertEqual(
+				response.data["error"]["code"],
+				"not_authenticated",
+			)
+
+		self.client.force_login(self.user)
+		authenticated_response = self.client.get(reverse("stock-list"))
+		self.assertEqual(authenticated_response.status_code, 200)
