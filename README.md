@@ -54,6 +54,8 @@ The API accepts either the existing Django session or a JWT access token for pro
 - `POST /api/token/` — obtain an access/refresh token pair with `username` and `password`.
 - `POST /api/token/refresh/` — rotate a refresh token by sending `refresh`; use the returned refresh token thereafter.
 - `POST /api/token/logout/` — revoke a refresh token by sending `refresh` with the authenticated user's access token.
+- `GET /api/users/account/` — authenticated; retrieve the current user's `username`, `first_name`, `last_name`, and `email`.
+- `PUT` or `PATCH /api/users/account/` — authenticated; update those same fields for the current user.
 - `POST /api/users/change-password/` — authenticated; send `old_password`, `new_password`, and `confirm_password`.
 - `POST /api/users/password-reset/` — request a reset email using `email`. The response does not disclose whether that account exists.
 - `POST /api/users/password-reset/confirm/` — reset using `uidb64`, `token`, `new_password`, and `confirm_password`.

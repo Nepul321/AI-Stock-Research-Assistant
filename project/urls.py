@@ -64,8 +64,10 @@ urlpatterns = [
         name="api_password_reset_confirm",
     ),
     path('api/users/', include('users.api.urls')),
+    path('api/advice/', include('advice.api.urls')),
     path('accounts/', include('users.urls')),
     path('stocks/', include('stocks.urls_frontend')),
     path('watchlists/', include('watchlists.urls_frontend')),
     path('portfolios/', include('portfolios.urls')),
+    path('advice/', include('advice.urls')),
 ]

@@ -32,6 +32,8 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL")
 
 
 # Application definition
@@ -51,6 +53,7 @@ INSTALLED_APPS = [
     'base',
     'users',
     'portfolios',
+    'advice',
 ]
 
 REST_FRAMEWORK = {

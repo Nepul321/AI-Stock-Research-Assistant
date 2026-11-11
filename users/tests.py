@@ -334,6 +334,68 @@ class AuthenticationAPITests(APITestCase):
 			change_response.data["error"]["details"],
 		)
 
+	def test_account_endpoint_requires_authentication(self):
+		response = self.client.patch(
+			reverse("api-account"),
+			{"first_name": "Updated"},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, 403)
+		self.assertEqual(
+			response.data["error"]["code"],
+			"not_authenticated",
+		)
+
+	def test_account_endpoint_reads_and_updates_authenticated_user(self):
+		self.client.force_authenticate(user=self.user)
+
+		read_response = self.client.get(reverse("api-account"))
+		self.assertEqual(read_response.status_code, 200)
+		self.assertEqual(
+			read_response.data,
+			{
+				"username": "api-auth-user",
+				"first_name": "",
+				"last_name": "",
+				"email": "api-auth@example.com",
+			},
+		)
+
+		update_response = self.client.patch(
+			reverse("api-account"),
+			{
+				"username": "updated-api-user",
+				"first_name": "Ada",
+				"last_name": "Lovelace",
+				"email": "ada@example.com",
+			},
+			format="json",
+		)
+
+		self.assertEqual(update_response.status_code, 200)
+		self.assertEqual(update_response.data["username"], "updated-api-user")
+		self.assertEqual(update_response.data["first_name"], "Ada")
+		self.assertEqual(update_response.data["last_name"], "Lovelace")
+		self.assertEqual(update_response.data["email"], "ada@example.com")
+		self.user.refresh_from_db()
+		self.assertEqual(self.user.username, "updated-api-user")
+		self.assertEqual(self.user.email, "ada@example.com")
+
+	def test_account_endpoint_rejects_an_existing_username(self):
+		User.objects.create_user(username="another-api-user")
+		self.client.force_authenticate(user=self.user)
+
+		response = self.client.patch(
+			reverse("api-account"),
+			{"username": "another-api-user"},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, 400)
+		self.assertEqual(response.data["error"]["code"], "validation_error")
+		self.assertIn("username", response.data["error"]["details"])
+
 	def test_web_password_change_keeps_session_available_for_logout(self):
 		self.client.force_login(self.user)
 
